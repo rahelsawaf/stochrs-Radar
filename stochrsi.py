@@ -1,5 +1,5 @@
 # Add the list of symbols here
-symbols1 = ["ADA", "VET"]  # List of symbols to fetch data for
+symbols1 = ["", ""]  # List of symbols to fetch data for
 
 # Rest of the code remains exactly the same
 import requests
@@ -10,11 +10,11 @@ from datetime import datetime
 import json  # Import json for serializing reply_markup
 
 # Replace with your actual CryptoCompare API key
-api_key = '72a7a3627d030f1b8f06ea07f5e30f32007d4e6e338ae584010feb82dab6f86e'
+api_key = ''
 
 # Replace with your Telegram bot token and chat ID
-bot_token = '6999594194:AAHna5wG3wbQMkHamC2qPKKiHEzePBiTHbg'
-chat_id = 'YOUR_CHAT_ID'
+bot_token = ''
+chat_id = ''
 
 # Dictionary to store active and inactive alerts
 active_alerts = {}  # Format: {(chat_id, symbol, timeframe): (threshold, direction, type)}
