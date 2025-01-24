@@ -1,5 +1,5 @@
 # Add the list of symbols here
-symbols = []  # List of symbols to fetch data for
+symbols1 = ["ADA" ,"VET"]  # List of symbols to fetch data for
 
 # Rest of the code remains exactly the same
 import requests
@@ -121,46 +121,43 @@ def handle_telegram_commands():
                     if text.startswith('/stochrsi'):
                         parts = text.split(' ')
                         if len(parts) == 3:
-                            symbol = parts[1]
-                            timeframe = parts[2]
-                            stochrsi_K = get_stoch_rsi(symbol, timeframe)
-                            if stochrsi_K is not None:
-                                response_message = f"{symbol} Stochastic RSI %K value for {timeframe} timeframe: {stochrsi_K:.2f}"
-                            else:
-                                response_message = f"Error fetching data for {symbol} in {timeframe} timeframe."
-                        elif len(parts) == 2:  # Only timeframe is provided
                             timeframe = parts[1]
-                            below_50 = [
-                            ]  # Symbols with Stochastic RSI below 50
-                            above_50 = [
-                            ]  # Symbols with Stochastic RSI equal to or above 50
+                            list_name = parts[2]  # e.g., symbols1, symbols2
+
+                            # Get the correct list of symbols
+                            if list_name == "symbols1":
+                                symbols = symbols1
+                            elif list_name == "symbols2":
+                                symbols = symbols2
+                            elif list_name == "symbols3":
+                                symbols = symbols3
+                            else:
+                                send_telegram_message(
+                                    chat_id,
+                                    f"Invalid list name: {list_name}. Use symbols1, symbols2, or symbols3."
+                                )
+                                continue
+
+                            below_50 = []  # Symbols with Stochastic RSI below 50
+                            above_50 = []  # Symbols with Stochastic RSI equal to or above 50
 
                             for symbol in symbols:
                                 stochrsi_K = get_stoch_rsi(symbol, timeframe)
                                 if stochrsi_K is not None:
                                     if stochrsi_K < 50:
-                                        below_50.append(
-                                            f"{symbol}: {stochrsi_K:.2f}")
+                                        below_50.append(f"{symbol}: {stochrsi_K:.2f}")
                                     else:
-                                        above_50.append(
-                                            f"{symbol}: {stochrsi_K:.2f}")
+                                        above_50.append(f"{symbol}: {stochrsi_K:.2f}")
                                 else:
-                                    below_50.append(
-                                        f"{symbol}: Error fetching data")
+                                    below_50.append(f"{symbol}: Error fetching data")
 
                             # Build the response message
-                            response_message = "Stochastic RSI Values:\n"
+                            response_message = f"Stochastic RSI Values for {list_name} ({timeframe}):\n"
                             response_message += "\n**Symbols below 50:**\n"
-                            response_message += "\n".join(
-                                below_50
-                            ) if below_50 else "No symbols below 50.\n"
+                            response_message += "\n".join(below_50) if below_50 else "No symbols below 50.\n"
                             response_message += "\n\n**Symbols equal to or above 50:**\n"
-                            response_message += "\n".join(
-                                above_50
-                            ) if above_50 else "No symbols above 50.\n"
-                        else:
-                            response_message = "Invalid command format. Use /stochrsi <symbol> <timeframe> or /stochrsi <timeframe>."
-                        send_telegram_message(chat_id, response_message)
+                            response_message += "\n".join(above_50) if above_50 else "No symbols above 50.\n"
+                            send_telegram_message(chat_id, response_message)
 
                     # Handle /setalert command (existing functionality)
                     elif text.startswith('/setalert'):
