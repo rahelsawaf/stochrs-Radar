@@ -12,7 +12,6 @@ import json  # Import json for serializing reply_markup
 import logging  # Import logging for debugging
 import os
 from threading import Thread
-from telegram import Bot
 from telegram.ext import Updater, Dispatcher
 from keep import keep_alive
 
