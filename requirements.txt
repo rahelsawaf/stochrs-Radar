@@ -1,2 +1,6 @@
 aiogram==2.23.1
-flask
+requests==2.31.0
+numpy==1.24.3
+pandas==2.0.3
+Flask==2.3.2
+gunicorn==20.1.0
