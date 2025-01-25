@@ -141,8 +141,10 @@ def send_telegram_message(chat_id, message, reply_markup=None):
         payload = {
             'chat_id': chat_id,
             'text': message,
-            'reply_markup': json.dumps(reply_markup) if reply_markup else None
         }
+        if reply_markup:
+            payload['reply_markup'] = reply_markup  # Pass the dictionary directly
+
         response = requests.post(url, json=payload)
         if response.status_code == 200:
             logging.info("Message sent to Telegram successfully!")
