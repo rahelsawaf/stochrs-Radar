@@ -12,7 +12,6 @@ import json  # Import json for serializing reply_markup
 import logging  # Import logging for debugging
 import os
 from threading import Thread
-from telegram.ext import Updater, Dispatcher
 from keep import keep_alive
 
 # Start the Flask app to keep the bot alive
@@ -20,9 +19,6 @@ keep_alive()
 
 # Initialize the bot
 bot_token = os.environ.get('token')  # Get the bot token from environment variables
-bot = Bot(token=bot_token)
-updater = Updater(token=bot_token, use_context=True)
-dp = updater.dispatcher
 
 # Replace with your actual CryptoCompare API key
 api_key = '72a7a3627d030f1b8f06ea07f5e30f32007d4e6e338ae584010feb82dab6f86e'
@@ -141,8 +137,17 @@ def get_current_price(symbol):
 # Function to send a message via Telegram
 def send_telegram_message(chat_id, message, reply_markup=None):
     try:
-        bot.send_message(chat_id=chat_id, text=message, reply_markup=reply_markup)
-        logging.info("Message sent to Telegram successfully!")
+        url = f'https://api.telegram.org/bot{bot_token}/sendMessage'
+        payload = {
+            'chat_id': chat_id,
+            'text': message,
+            'reply_markup': json.dumps(reply_markup) if reply_markup else None
+        }
+        response = requests.post(url, json=payload)
+        if response.status_code == 200:
+            logging.info("Message sent to Telegram successfully!")
+        else:
+            logging.error(f"Failed to send message to Telegram: {response.text}")
     except Exception as e:
         logging.error(f"Failed to send message to Telegram: {e}")
 
@@ -268,7 +273,7 @@ def handle_telegram_commands():
                     elif text == '/clearalerts':
                         for (alert_chat_id, symbol, timeframe) in list(active_alerts.keys()):
                             if alert_chat_id == chat_id:
-                                inactive_alerts[(chat_id, symbol, timeframe)] = active_alerts.pop((chat_id, symbol, timeframe))
+                                inactive_alerts[(chat_id, symbol, timeframe)] = active_alerts.pop((alert_chat_id, symbol, timeframe))
                         send_telegram_message(chat_id, "All your alerts have been cleared and moved to inactive alerts.")
 
                     # Handle /listalerts command (existing functionality)
@@ -352,7 +357,32 @@ def handle_telegram_commands():
 
         time.sleep(1)  # Wait before polling again
 
+# Function to check alerts in a separate thread
+def check_alerts():
+    while True:
+        for (alert_chat_id, symbol, timeframe), (threshold, direction, alert_type) in list(active_alerts.items()):
+            if alert_type == "stoch_rsi":
+                stochrsi_K = get_stoch_rsi(symbol, timeframe)
+                if stochrsi_K is not None:
+                    if (direction == "below" and stochrsi_K < threshold) or (direction == "above" and stochrsi_K > threshold):
+                        alert_message = f"Alert! {symbol} Stochastic RSI %K in {timeframe} timeframe is {direction} {threshold}: {stochrsi_K:.2f}"
+                        send_telegram_message(alert_chat_id, alert_message)
+                        inactive_alerts[(alert_chat_id, symbol, timeframe)] = active_alerts.pop((alert_chat_id, symbol, timeframe))
+            elif alert_type == "price":
+                current_price = get_current_price(symbol)
+                if current_price is not None:
+                    if (direction == "below" and current_price < threshold) or (direction == "above" and current_price > threshold):
+                        alert_message = f"Alert! {symbol} price is {direction} {threshold}: {current_price:.2f}"
+                        send_telegram_message(alert_chat_id, alert_message)
+                        inactive_alerts[(alert_chat_id, symbol, timeframe)] = active_alerts.pop((alert_chat_id, symbol, timeframe))
+        time.sleep(60)  # Check alerts every 60 seconds
+
 # Start the bot
 if __name__ == '__main__':
     print("Bot is running...")
+    # Start the alert checking thread
+    alert_thread = Thread(target=check_alerts)
+    alert_thread.daemon = True
+    alert_thread.start()
+    # Start handling Telegram commands
     handle_telegram_commands()
