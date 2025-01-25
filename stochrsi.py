@@ -1,6 +1,7 @@
 # Add the list of symbols here
 symbols1 = []
 symbols2 = []
+
 # Rest of the code remains exactly the same
 import requests
 import numpy as np
@@ -10,17 +11,22 @@ from datetime import datetime
 import json  # Import json for serializing reply_markup
 import logging  # Import logging for debugging
 import os
+from threading import Thread
+from telegram import Bot
+from telegram.ext import Updater, Dispatcher
 from keep import keep_alive
+
+# Start the Flask app to keep the bot alive
 keep_alive()
-bot= bot(token=os.environ.get('token'))
-dp=dispatcher(bot)
+
+# Initialize the bot
+bot_token = os.environ.get('token')  # Get the bot token from environment variables
+bot = Bot(token=bot_token)
+updater = Updater(token=bot_token, use_context=True)
+dp = updater.dispatcher
 
 # Replace with your actual CryptoCompare API key
 api_key = '72a7a3627d030f1b8f06ea07f5e30f32007d4e6e338ae584010feb82dab6f86e'
-
-# Replace with your Telegram bot token and chat ID
-bot_token = '6999594194:AAHna5wG3wbQMkHamC2qPKKiHEzePBiTHbg'
-chat_id = ''
 
 # Dictionary to store active and inactive alerts
 active_alerts = {}  # Format: {(chat_id, symbol, timeframe): (threshold, direction, type)}
@@ -31,7 +37,6 @@ start_time = time.time()
 
 # Set up logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
-
 
 # Function to calculate RSI using TradingView methodology
 def rsi_tradingview(ohlc: pd.DataFrame, period: int = 14, round_rsi: bool = True):
@@ -46,7 +51,6 @@ def rsi_tradingview(ohlc: pd.DataFrame, period: int = 14, round_rsi: bool = True
     rsi = np.where(up == 0, 0, np.where(down == 0, 100, 100 - (100 / (1 + up / down))))
     return np.round(rsi, 2) if round_rsi else rsi
 
-
 # Function to calculate Stochastic RSI using TradingView methodology
 def stoch_rsi_tradingview(ohlc: pd.DataFrame, period=14, smoothK=3, smoothD=3):
     rsi = rsi_tradingview(ohlc, period=period, round_rsi=False)
@@ -55,7 +59,6 @@ def stoch_rsi_tradingview(ohlc: pd.DataFrame, period=14, smoothK=3, smoothD=3):
     stochrsi_K = stochrsi.rolling(smoothK).mean()
     stochrsi_D = stochrsi_K.rolling(smoothD).mean()
     return round(stochrsi_K * 100, 2)  # Return only the %K values
-
 
 # Function to fetch data and calculate Stochastic RSI for a given symbol and time frame
 def get_stoch_rsi(symbol, timeframe):
@@ -96,7 +99,6 @@ def get_stoch_rsi(symbol, timeframe):
     stochrsi_K = stoch_rsi_tradingview(ohlc, period=14, smoothK=3, smoothD=3)
     return stochrsi_K.iloc[-1]  # Return the latest %K value
 
-
 # Function to handle the /start command with inline keyboard
 def handle_start_command(chat_id):
     # Create an inline keyboard with buttons for LIST1 and LIST2
@@ -130,7 +132,6 @@ def handle_start_command(chat_id):
     # Send the welcome message with the inline keyboard
     send_telegram_message(chat_id, welcome_message, reply_markup=keyboard)
 
-
 # Function to get the current price of a symbol
 def get_current_price(symbol):
     url = f'https://min-api.cryptocompare.com/data/price?fsym={symbol}&tsyms=USDT&api_key={api_key}'
@@ -138,19 +139,13 @@ def get_current_price(symbol):
     data = response.json()
     return data.get('USDT')
 
-
 # Function to send a message via Telegram
 def send_telegram_message(chat_id, message, reply_markup=None):
-    telegram_url = f'https://api.telegram.org/bot{bot_token}/sendMessage'
-    payload = {'chat_id': chat_id, 'text': message}
-    if reply_markup:
-        payload['reply_markup'] = json.dumps(reply_markup)
-    response = requests.post(telegram_url, data=payload)
-    if response.status_code == 200:
+    try:
+        bot.send_message(chat_id=chat_id, text=message, reply_markup=reply_markup)
         logging.info("Message sent to Telegram successfully!")
-    else:
-        logging.error(f"Failed to send message to Telegram: {response.text}")
-
+    except Exception as e:
+        logging.error(f"Failed to send message to Telegram: {e}")
 
 # Function to handle callback queries from inline keyboards
 def handle_callback_query(update):
@@ -195,7 +190,6 @@ def handle_callback_query(update):
                 response_message += "\n\n**Symbols equal to or above 50:**\n"
                 response_message += "\n".join(above_50) if above_50 else "No symbols above 50.\n"
                 send_telegram_message(chat_id, response_message)
-
 
 # Function to handle Telegram commands
 def handle_telegram_commands():
@@ -358,7 +352,6 @@ def handle_telegram_commands():
                         inactive_alerts[(alert_chat_id, symbol, timeframe)] = active_alerts.pop((alert_chat_id, symbol, timeframe))
 
         time.sleep(1)  # Wait before polling again
-
 
 # Start the bot
 if __name__ == '__main__':
