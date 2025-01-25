@@ -1,6 +1,6 @@
 # Add the list of symbols here
-symbols1 = ["", ""]  # List of symbols to fetch data for
-
+symbols1 = []
+symbols2 = []
 # Rest of the code remains exactly the same
 import requests
 import numpy as np
@@ -8,6 +8,7 @@ import pandas as pd
 import time
 from datetime import datetime
 import json  # Import json for serializing reply_markup
+import logging  # Import logging for debugging
 
 # Replace with your actual CryptoCompare API key
 api_key = ''
@@ -22,6 +23,9 @@ inactive_alerts = {}  # Format: {(chat_id, symbol, timeframe): (threshold, direc
 
 # Track bot start time for uptime calculation
 start_time = time.time()
+
+# Set up logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 
 # Function to calculate RSI using TradingView methodology
@@ -50,6 +54,7 @@ def stoch_rsi_tradingview(ohlc: pd.DataFrame, period=14, smoothK=3, smoothD=3):
 
 # Function to fetch data and calculate Stochastic RSI for a given symbol and time frame
 def get_stoch_rsi(symbol, timeframe):
+    # Define the API URL based on the timeframe
     if timeframe == "1D":
         url = f'https://min-api.cryptocompare.com/data/histoday?fsym={symbol}&tsym=USDT&limit=100&api_key={api_key}&e=Kucoin'
     elif timeframe == "1W":
@@ -61,16 +66,30 @@ def get_stoch_rsi(symbol, timeframe):
     elif timeframe == "15M":
         url = f'https://min-api.cryptocompare.com/data/histominute?fsym={symbol}&tsym=USDT&limit=200&api_key={api_key}&e=Kucoin'
     else:
-        return None  # Invalid timeframe
+        logging.error(f"Invalid timeframe: {timeframe}")
+        return None
 
+    # Fetch data from the API
     response = requests.get(url)
     data = response.json()
-    if 'Data' in data:
-        ohlc = pd.DataFrame(data['Data'])
-        stochrsi_K = stoch_rsi_tradingview(ohlc, period=14, smoothK=3, smoothD=3)
-        return stochrsi_K.iloc[-1]  # Return the latest %K value
-    else:
-        return None  # Return None if data fetching fails
+
+    # Check if the response contains the expected data
+    if 'Data' not in data or not data['Data']:
+        logging.error(f"No data found for {symbol} ({timeframe}).")
+        return None
+
+    # Create a DataFrame from the OHLC data
+    ohlc = pd.DataFrame(data['Data'])
+
+    # Ensure the required columns are present
+    required_columns = ['time', 'open', 'high', 'low', 'close']
+    if not all(col in ohlc.columns for col in required_columns):
+        logging.error(f"Missing required columns in the OHLC data for {symbol} ({timeframe}).")
+        return None
+
+    # Calculate Stochastic RSI
+    stochrsi_K = stoch_rsi_tradingview(ohlc, period=14, smoothK=3, smoothD=3)
+    return stochrsi_K.iloc[-1]  # Return the latest %K value
 
 
 # Function to handle the /start command with inline keyboard
@@ -83,6 +102,12 @@ def handle_start_command(chat_id):
              {"text": "LIST1 - 4H", "callback_data": "/stochrsi symbols1 4H"},
              {"text": "LIST1 - D", "callback_data": "/stochrsi symbols1 1D"},
              {"text": "LIST1 - W", "callback_data": "/stochrsi symbols1 1W"}],
+
+            [{"text": "LIST2 - 15M", "callback_data": "/stochrsi symbols2 15M"},
+             {"text": "LIST2 - 1H", "callback_data": "/stochrsi symbols2 1H"},
+             {"text": "LIST2 - 4H", "callback_data": "/stochrsi symbols2 4H"},
+             {"text": "LIST2 - D", "callback_data": "/stochrsi symbols2 1D"},
+             {"text": "LIST2 - W", "callback_data": "/stochrsi symbols2 1W"}],
         ]
     }
 
@@ -95,8 +120,7 @@ def handle_start_command(chat_id):
         "/setpricealert <symbol> <threshold> <direction> - Set a price alert.\n"
         "/clearalerts - Clear all your alerts.\n"
         "/listalerts - View active and inactive alerts.\n"
-        "/status - Check the bot's status.\n"
-    )
+        "/status - Check the bot's status.\n")
 
     # Send the welcome message with the inline keyboard
     send_telegram_message(chat_id, welcome_message, reply_markup=keyboard)
@@ -118,9 +142,9 @@ def send_telegram_message(chat_id, message, reply_markup=None):
         payload['reply_markup'] = json.dumps(reply_markup)
     response = requests.post(telegram_url, data=payload)
     if response.status_code == 200:
-        print("Message sent to Telegram successfully!")
+        logging.info("Message sent to Telegram successfully!")
     else:
-        print("Failed to send message to Telegram:", response.text)
+        logging.error(f"Failed to send message to Telegram: {response.text}")
 
 
 # Function to handle callback queries from inline keyboards
@@ -140,6 +164,8 @@ def handle_callback_query(update):
                 # Get the correct list of symbols
                 if list_name == "symbols1":
                     symbols = symbols1
+                elif list_name == "symbols2":
+                    symbols = symbols2
                 else:
                     send_telegram_message(chat_id, f"Invalid list name: {list_name}.")
                     return
