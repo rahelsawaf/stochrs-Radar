@@ -9,12 +9,17 @@ import time
 from datetime import datetime
 import json  # Import json for serializing reply_markup
 import logging  # Import logging for debugging
+import os
+from keep import keep_alive
+keep_alive()
+bot= bot(token=os.environ.get('token'))
+dp=dispatcher(bot)
 
 # Replace with your actual CryptoCompare API key
-api_key = ''
+api_key = '72a7a3627d030f1b8f06ea07f5e30f32007d4e6e338ae584010feb82dab6f86e'
 
 # Replace with your Telegram bot token and chat ID
-bot_token = ''
+bot_token = '6999594194:AAHna5wG3wbQMkHamC2qPKKiHEzePBiTHbg'
 chat_id = ''
 
 # Dictionary to store active and inactive alerts
